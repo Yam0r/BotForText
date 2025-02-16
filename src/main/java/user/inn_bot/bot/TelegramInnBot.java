@@ -26,12 +26,12 @@ public class TelegramInnBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return "myinnbot";
+        return "${BOT_NAME}";
     }
 
     @Override
     public String getBotToken() {
-        return "7971372249:AAEqi7modRgOCYa2V2XxRycjaH31SPzi6ZU";
+        return "${BOT_TOKEN}";
     }
 
     @Override
