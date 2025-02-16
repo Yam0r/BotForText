@@ -1,5 +1,6 @@
 package user.inn_bot.bot;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -19,6 +20,10 @@ import java.util.List;
 @Component
 public class TelegramInnBot extends TelegramLongPollingBot {
     private final InnService innService;
+    @Value("${BOT_TOKEN}")
+    private String BOT_TOKEN;
+    @Value("${BOT_NAME}")
+    private String BOT_NAME;
 
     public TelegramInnBot(InnService innService) {
         this.innService = innService;
@@ -26,12 +31,12 @@ public class TelegramInnBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return "myinnbot";
+        return BOT_NAME;
     }
 
     @Override
     public String getBotToken() {
-        return "7971372249:AAEqi7modRgOCYa2V2XxRycjaH31SPzi6ZU";
+        return BOT_TOKEN;
     }
 
     @Override
@@ -41,31 +46,48 @@ public class TelegramInnBot extends TelegramLongPollingBot {
             long chatId = message.getChatId();
 
             if (message.hasText()) {
-                String messageText = message.getText().trim();  // Убираем лишние пробелы
+                String messageText = message.getText().trim();
 
                 if (messageText.equalsIgnoreCase("/start")) {
                     sendMainMenu(chatId);
                 } else {
-                    handleInn(chatId, messageText);  // Переносим сюда проверку ИНН
+                    handleInn(chatId, messageText);
                 }
             } else if (message.hasDocument()) {
-                handleDocument(chatId, message);  // Обработка документа
+                handleDocument(chatId, message);
+            }
+        } else if (update.hasCallbackQuery()) {
+            String callbackData = update.getCallbackQuery().getData();
+            long chatId = update.getCallbackQuery().getMessage().getChatId();
+
+            if (callbackData.startsWith("add_inn_")) {
+                String inn = callbackData.replace("add_inn_", "");
+
+                if (innService.isInnExists(inn)) {
+                    sendTextMessage(chatId, "ИНН " + inn + " уже есть в базе.");
+                } else {
+                    innService.saveInn(inn);
+                    sendTextMessage(chatId, "ИНН " + inn + " успешно добавлен в базу.");
+                }
+            } else if (callbackData.equals("cancel")) {
+                sendTextMessage(chatId, "Добавление ИНН отменено.");
             }
         }
     }
 
-    private void handleInn(long chatId, String inn) {
-        String digitsOnlyInn = inn.replaceAll("[^\\d]", "");  // Убираем все нецифровые символы
 
-        if (digitsOnlyInn.matches("\\d{10}")) {  // Проверка на 10-значное число
+    private void handleInn(long chatId, String inn) {
+        String digitsOnlyInn = inn.replaceAll("[^\\d]", "");
+
+        if (digitsOnlyInn.matches("\\d{10}")) {
             if (innService.isInnExists(digitsOnlyInn)) {
                 sendTextMessage(chatId, "ИНН уже есть в базе.");
             } else {
                 sendInlineKeyboard(chatId, digitsOnlyInn);
             }
         } else {
-            int length = digitsOnlyInn.length();  // Получаем количество цифр
-            String digitForm = getDigitForm(length);  // Получаем правильное склонение
+            int length = digitsOnlyInn.length();
+            String digitForm = getDigitForm(length);
 
             sendTextMessage(chatId, "Вы написали " + length + " " + digitForm + ", а должно быть 10.");
         }
@@ -125,7 +147,7 @@ public class TelegramInnBot extends TelegramLongPollingBot {
     private void sendMainMenu(long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText("Выберите действие:");
+        message.setText("Вам доступно:");
 
         InlineKeyboardMarkup keyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -133,7 +155,7 @@ public class TelegramInnBot extends TelegramLongPollingBot {
         InlineKeyboardButton addButton = new InlineKeyboardButton("Добавить ИНН");
         addButton.setCallbackData("add_inn");
 
-        InlineKeyboardButton searchButton = new InlineKeyboardButton("Поиск ИНН");
+        InlineKeyboardButton searchButton = new InlineKeyboardButton("Проверка статуса ИНН");
         searchButton.setCallbackData("search_inn");
 
         List<InlineKeyboardButton> row = new ArrayList<>();
