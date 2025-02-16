@@ -26,12 +26,12 @@ public class TelegramInnBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return "${BOT_NAME}";
+        return "myinnbot";
     }
 
     @Override
     public String getBotToken() {
-        return "${BOT_TOKEN}";
+        return "7971372249:AAEqi7modRgOCYa2V2XxRycjaH31SPzi6ZU";
     }
 
     @Override
@@ -41,39 +41,43 @@ public class TelegramInnBot extends TelegramLongPollingBot {
             long chatId = message.getChatId();
 
             if (message.hasText()) {
-                String messageText = message.getText();
+                String messageText = message.getText().trim();  // Убираем лишние пробелы
+
                 if (messageText.equalsIgnoreCase("/start")) {
                     sendMainMenu(chatId);
-                } else if (messageText.matches("\\d{10}")) {
-                    handleInn(chatId, messageText);
                 } else {
-                    sendTextMessage(chatId, "Я понимаю только команды /start и ИНН в виде 10-значного числа.");
+                    handleInn(chatId, messageText);  // Переносим сюда проверку ИНН
                 }
-            }
-        } else if (update.hasCallbackQuery()) {
-            String callbackData = update.getCallbackQuery().getData();
-            long chatId = update.getCallbackQuery().getMessage().getChatId();
-
-            if (callbackData.startsWith("add_inn_")) {
-                String inn = callbackData.replace("add_inn_", "");
-
-                if (innService.isInnExists(inn)) {
-                    sendTextMessage(chatId, "ИНН " + inn + " уже есть в базе.");
-                } else {
-                    innService.saveInn(inn);
-                    sendTextMessage(chatId, "ИНН " + inn + " успешно добавлен в базу.");
-                }
-            } else if (callbackData.equals("cancel")) {
-                sendTextMessage(chatId, "Добавление отменено.");
+            } else if (message.hasDocument()) {
+                handleDocument(chatId, message);  // Обработка документа
             }
         }
     }
 
     private void handleInn(long chatId, String inn) {
-        if (innService.isInnExists(inn)) {
-            sendTextMessage(chatId, "ИНН уже есть в базе.");
+        String digitsOnlyInn = inn.replaceAll("[^\\d]", "");  // Убираем все нецифровые символы
+
+        if (digitsOnlyInn.matches("\\d{10}")) {  // Проверка на 10-значное число
+            if (innService.isInnExists(digitsOnlyInn)) {
+                sendTextMessage(chatId, "ИНН уже есть в базе.");
+            } else {
+                sendInlineKeyboard(chatId, digitsOnlyInn);
+            }
         } else {
-            sendInlineKeyboard(chatId, inn);
+            int length = digitsOnlyInn.length();  // Получаем количество цифр
+            String digitForm = getDigitForm(length);  // Получаем правильное склонение
+
+            sendTextMessage(chatId, "Вы написали " + length + " " + digitForm + ", а должно быть 10.");
+        }
+    }
+
+    private String getDigitForm(int length) {
+        if (length == 1) {
+            return "цифра";
+        } else if (length >= 2 && length <= 4) {
+            return "цифры";
+        } else {
+            return "цифр";
         }
     }
 
